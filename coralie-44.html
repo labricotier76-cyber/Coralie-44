@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CORALIE.exe — Version 44.0</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=VT323&display=swap');
+
+  :root {
+    --green: #00ff88;
+    --green-dim: #00aa55;
+    --green-glow: rgba(0,255,136,0.4);
+    --bg: #0a0f0a;
+    --bg2: #0d140d;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--green);
+    font-family: 'Share Tech Mono', monospace;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    position: relative;
+  }
+
+  /* Scanlines */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.15) 2px,
+      rgba(0,0,0,0.15) 4px
+    );
+    pointer-events: none;
+    z-index: 100;
+  }
+
+  /* Screen flicker */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: radial-gradient(ellipse at center, rgba(0,255,136,0.03) 0%, rgba(0,0,0,0.3) 100%);
+    pointer-events: none;
+    z-index: 99;
+    animation: flicker 8s infinite;
+  }
+
+  @keyframes flicker {
+    0%, 95%, 97%, 100% { opacity: 1; }
+    96% { opacity: 0.85; }
+    96.5% { opacity: 1; }
+  }
+
+  .terminal {
+    width: min(700px, 96vw);
+    max-height: 95vh;
+    overflow-y: auto;
+    background: var(--bg2);
+    border: 1px solid var(--green-dim);
+    border-radius: 6px;
+    box-shadow:
+      0 0 20px var(--green-glow),
+      0 0 60px rgba(0,255,136,0.1),
+      inset 0 0 30px rgba(0,0,0,0.5);
+    padding: 0;
+    position: relative;
+  }
+
+  .terminal::-webkit-scrollbar { width: 6px; }
+  .terminal::-webkit-scrollbar-track { background: #0a0f0a; }
+  .terminal::-webkit-scrollbar-thumb { background: var(--green-dim); border-radius: 3px; }
+
+  .titlebar {
+    background: var(--green-dim);
+    color: var(--bg);
+    padding: 6px 14px;
+    font-family: 'VT323', monospace;
+    font-size: 1.1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    user-select: none;
+  }
+
+  .titlebar .dots { display: flex; gap: 6px; }
+  .dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: var(--bg);
+    opacity: 0.6;
+  }
+
+  .content {
+    padding: 20px 24px 28px;
+    font-size: clamp(0.82rem, 2.3vw, 0.95rem);
+    line-height: 1.7;
+  }
+
+  .line {
+    display: block;
+    opacity: 0;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  .line.visible { opacity: 1; }
+
+  .line.dim { color: var(--green-dim); }
+  .line.bright { color: #ffffff; text-shadow: 0 0 8px var(--green-glow); }
+  .line.alert {
+    color: #ffdd00;
+    text-shadow: 0 0 10px rgba(255,220,0,0.5);
+    font-family: 'VT323', monospace;
+    font-size: clamp(1.1rem, 3.5vw, 1.4rem);
+  }
+  .line.big {
+    font-family: 'VT323', monospace;
+    font-size: clamp(1.5rem, 5vw, 2.2rem);
+    color: #ffffff;
+    text-shadow: 0 0 20px var(--green-glow), 0 0 40px rgba(0,255,136,0.3);
+    line-height: 1.3;
+  }
+  .line.sub {
+    color: var(--green);
+    padding-left: 4px;
+  }
+  .line.gap { display: block; height: 0.6em; opacity: 1; }
+  .line.separator { color: var(--green-dim); }
+
+  .cursor {
+    display: inline-block;
+    width: 9px;
+    height: 1.1em;
+    background: var(--green);
+    vertical-align: middle;
+    margin-left: 2px;
+    animation: blink 0.9s step-end infinite;
+  }
+  @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+
+  .progress-wrap {
+    opacity: 0;
+    margin: 4px 0;
+    transition: opacity 0.3s;
+  }
+  .progress-wrap.visible { opacity: 1; }
+  .progress-bar {
+    display: inline-block;
+    background: var(--green-dim);
+    height: 10px;
+    width: 0%;
+    transition: width 0.8s ease;
+    box-shadow: 0 0 6px var(--green-glow);
+  }
+  .progress-track {
+    display: inline-block;
+    width: 180px;
+    height: 10px;
+    background: #0f1f0f;
+    border: 1px solid var(--green-dim);
+    vertical-align: middle;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* Confetti finale */
+  .confetti-container {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 200;
+    display: none;
+  }
+  .confetti-container.active { display: block; }
+  .confetti-piece {
+    position: absolute;
+    top: -10px;
+    width: 8px;
+    height: 8px;
+    opacity: 0;
+    animation: fall linear forwards;
+  }
+  @keyframes fall {
+    0% { opacity: 1; transform: translateY(0) rotate(0deg); }
+    100% { opacity: 0; transform: translateY(110vh) rotate(720deg); }
+  }
+
+  .finale-glow {
+    animation: pulseGlow 2s ease-in-out infinite;
+  }
+  @keyframes pulseGlow {
+    0%, 100% { text-shadow: 0 0 20px var(--green-glow), 0 0 40px rgba(0,255,136,0.3); }
+    50% { text-shadow: 0 0 40px rgba(0,255,136,0.9), 0 0 80px rgba(0,255,136,0.5); }
+  }
+</style>
+</head>
+<body>
+
+<div class="confetti-container" id="confetti"></div>
+
+<div class="terminal">
+  <div class="titlebar">
+    <div class="dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+    <span>CORALIE.exe — Terminal v44.0</span>
+    <span>●</span>
+  </div>
+  <div class="content" id="content">
+    <span class="cursor" id="cursor"></span>
+  </div>
+</div>
+
+<script>
+const lines = [
+  { text: '▶  DÉMARRAGE DU PROGRAMME : CORALIE.exe', cls: 'bright', delay: 0 },
+  { text: '', cls: 'gap', delay: 300 },
+  { text: 'Initialisation du système...', cls: 'dim', delay: 600 },
+  { text: 'Chargement kernel 44-bits...', cls: 'dim', delay: 900 },
+  { text: '', cls: 'gap', delay: 1100 },
+  { text: '════════════════════════════════════════', cls: 'separator', delay: 1200 },
+  { text: '  ANALYSE DU SUJET EN COURS...', cls: 'bright', delay: 1400 },
+  { text: '════════════════════════════════════════', cls: 'separator', delay: 1600 },
+  { text: '', cls: 'gap', delay: 1700 },
+  { text: '  Nom         : Coralie', cls: '', delay: 1900 },
+  { text: '  Alias       : "P\'tit Tabouret"', cls: '', delay: 2200 },
+  { text: '  Version     : 44.0  ← mise à jour ce jour !', cls: '', delay: 2500 },
+  { text: '  Statut      : CLASSE & ÉLÉGANCE activées ✔', cls: 'bright', delay: 2800 },
+  { text: '', cls: 'gap', delay: 3000 },
+  { text: '════════════════════════════════════════', cls: 'separator', delay: 3100 },
+  { text: '  CHARGEMENT DES MODULES...', cls: 'bright', delay: 3200 },
+  { text: '════════════════════════════════════════', cls: 'separator', delay: 3300 },
+  { text: '', cls: 'gap', delay: 3400 },
+  { text: '🏃 Module SPORT', cls: 'bright', delay: 3600, progress: true },
+  { text: '   Fréquence  : Élevée  |  Résultat : Impressionnant', cls: 'sub', delay: 4800 },
+  { text: '', cls: 'gap', delay: 4900 },
+  { text: '💄 Module ÉLÉGANCE', cls: 'bright', delay: 5100, progress: true },
+  { text: '   Niveau     : Très soignée  |  Style : Chic confirmé ✦', cls: 'sub', delay: 6300 },
+  { text: '', cls: 'gap', delay: 6400 },
+  { text: '💪 Module ÉNERGIE', cls: 'bright', delay: 6600, progress: true },
+  { text: '   Résultat   : INÉPUISABLE  |  Batterie : ██████ 100%', cls: 'sub', delay: 7800 },
+  { text: '', cls: 'gap', delay: 7900 },
+  { text: '════════════════════════════════════════', cls: 'separator', delay: 8100 },
+  { text: '  VÉRIFICATION DU CALENDRIER...', cls: 'bright', delay: 8300 },
+  { text: '════════════════════════════════════════', cls: 'separator', delay: 8400 },
+  { text: '', cls: 'gap', delay: 8500 },
+  { text: '  [ ALERTE CRITIQUE ] ⚠', cls: 'alert', delay: 8800 },
+  { text: '  Aujourd\'hui est un jour PARTICULIER.', cls: 'alert', delay: 9200 },
+  { text: '', cls: 'gap', delay: 9400 },
+  { text: '  → ANNIVERSAIRE DÉTECTÉ !', cls: 'bright', delay: 9700 },
+  { text: '  → Lancement du PROTOCOLE FÊTE...', cls: 'bright', delay: 10000 },
+  { text: '', cls: 'gap', delay: 10300 },
+  { text: '════════════════════════════════════════', cls: 'separator', delay: 10400 },
+  { text: '', cls: 'gap', delay: 10500 },
+  { text: '🎂  BON ANNIVERSAIRE CORALIE !', cls: 'big finale-glow', delay: 10800 },
+  { text: '', cls: 'gap', delay: 11000 },
+  { text: '  Que cette version 44.0 t\'apporte :', cls: 'bright', delay: 11400 },
+  { text: '', cls: 'gap', delay: 11600 },
+  { text: '  – encore plus de kilomètres parcourus 🏃', cls: 'sub', delay: 11900 },
+  { text: '  – beaucoup de moments heureux ✨', cls: 'sub', delay: 12300 },
+  { text: '  – et toujours autant de classe 💫', cls: 'sub', delay: 12700 },
+  { text: '', cls: 'gap', delay: 13000 },
+  { text: '════════════════════════════════════════', cls: 'separator', delay: 13200 },
+  { text: '', cls: 'gap', delay: 13300 },
+  { text: '  Le système confirme :', cls: 'dim', delay: 13500 },
+  { text: '  Tu es officiellement une personne EXCEPTIONNELLE. 🌟', cls: 'bright', delay: 13900 },
+  { text: '', cls: 'gap', delay: 14200 },
+  { text: '════════════════════════════════════════', cls: 'separator', delay: 14400 },
+  { text: '  FIN DU PROGRAMME. Appuyez sur ❤️  pour continuer.', cls: 'dim', delay: 14700 },
+  { text: '════════════════════════════════════════', cls: 'separator', delay: 14900 },
+];
+
+const content = document.getElementById('content');
+const cursorEl = document.getElementById('cursor');
+
+let lineIndex = 0;
+
+function makeProgress() {
+  const wrap = document.createElement('div');
+  wrap.className = 'progress-wrap';
+  const track = document.createElement('span');
+  track.className = 'progress-track';
+  const bar = document.createElement('span');
+  bar.className = 'progress-bar';
+  track.appendChild(bar);
+  wrap.appendChild(document.createTextNode(' '));
+  wrap.appendChild(track);
+  wrap.appendChild(document.createTextNode(' OK'));
+  return { wrap, bar };
+}
+
+function showLine(item) {
+  const span = document.createElement('div');
+  span.textContent = item.text;
+  span.className = 'line ' + (item.cls || '');
+
+  if (item.progress) {
+    // Insert label line
+    content.insertBefore(span, cursorEl);
+    span.classList.add('visible');
+
+    // Insert progress bar
+    const { wrap, bar } = makeProgress();
+    content.insertBefore(wrap, cursorEl);
+    requestAnimationFrame(() => {
+      wrap.classList.add('visible');
+      requestAnimationFrame(() => { bar.style.width = '100%'; });
+    });
+  } else {
+    content.insertBefore(span, cursorEl);
+    requestAnimationFrame(() => span.classList.add('visible'));
+  }
+
+  content.scrollTop = content.scrollHeight;
+}
+
+function runNext() {
+  if (lineIndex >= lines.length) {
+    // Remove cursor at the end
+    cursorEl.style.display = 'none';
+    launchConfetti();
+    return;
+  }
+  const item = lines[lineIndex];
+  const prevDelay = lineIndex === 0 ? 0 : lines[lineIndex - 1].delay;
+  const wait = item.delay - prevDelay;
+
+  setTimeout(() => {
+    showLine(item);
+    lineIndex++;
+    runNext();
+  }, wait);
+}
+
+runNext();
+
+// Confetti
+function launchConfetti() {
+  const container = document.getElementById('confetti');
+  container.classList.add('active');
+  const colors = ['#00ff88','#ffdd00','#ff6b6b','#ffffff','#88aaff','#ff88cc'];
+  for (let i = 0; i < 80; i++) {
+    setTimeout(() => {
+      const p = document.createElement('div');
+      p.className = 'confetti-piece';
+      p.style.left = Math.random() * 100 + 'vw';
+      p.style.background = colors[Math.floor(Math.random() * colors.length)];
+      p.style.width = (6 + Math.random() * 10) + 'px';
+      p.style.height = (6 + Math.random() * 10) + 'px';
+      p.style.borderRadius = Math.random() > 0.5 ? '50%' : '2px';
+      const dur = 2 + Math.random() * 3;
+      p.style.animationDuration = dur + 's';
+      p.style.animationDelay = (Math.random() * 1) + 's';
+      container.appendChild(p);
+      setTimeout(() => p.remove(), (dur + 1) * 1000);
+    }, i * 60);
+  }
+}
+</script>
+</body>
+</html>
